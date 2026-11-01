@@ -1,0 +1,4 @@
+#%PAM-1.0
+# авто-скан лица при блокировке: только howdy, без pam_unix/faillock — промах не считается неудачным паролем
+
+auth    required                    /usr/lib/security/pam_howdy.so
