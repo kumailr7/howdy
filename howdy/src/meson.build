@@ -22,6 +22,7 @@ py_sources = [
     'cli/clear.py',
     'cli/config.py',
     'cli/disable.py',
+    'cli/doctor.py',
     'cli/list.py',
     'cli/remove.py',
     'cli/set.py',
