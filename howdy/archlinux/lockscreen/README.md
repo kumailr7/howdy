@@ -28,3 +28,13 @@ location is `~/.local/share/glyph/config/quickshell/glyph`). Run
   live island when both are visible:
 
       FaceIsland { offset: live.occupied }
+
+## Headphones pill
+
+- `glyph/glyph/HeadsetIsland.qml`: when a Bluetooth headset connects, a pill with
+  the headphones icon, the device name and a battery ring (red at 20% or less)
+  drops from the top for a few seconds. It skips Nothing/CMF/Ear devices, which
+  already have their own card (`buds/Buds.qml`). Add it to `glyph/Glyph.qml`
+  below the `FaceIsland` line:
+
+      HeadsetIsland { offset: live.occupied }
