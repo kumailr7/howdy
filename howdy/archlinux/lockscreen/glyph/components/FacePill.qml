@@ -25,7 +25,10 @@ Rectangle {
         return "face scan failed";
     }
 
-    width: phase === "scanning" ? 92 : phase === "success" ? 190 : 250
+    // ширина по тексту: отступ, замок, зазор, подпись, отступ — а не фиксированная, чтобы подпись всегда влезала
+    readonly property real textW: phase === "success" || phase === "failed" ? msg.implicitWidth : 0
+    readonly property real wantW: phase === "scanning" ? 92 : 14 + 26 + 12 + textW + 22
+    width: wantW
     height: phase === "scanning" ? 92 : 44
     Behavior on width { NumberAnimation { duration: 460; easing.type: Easing.OutBack; easing.overshoot: 1.1 } }
     Behavior on height { NumberAnimation { duration: 460; easing.type: Easing.OutBack; easing.overshoot: 1.1 } }
@@ -150,11 +153,14 @@ Rectangle {
         NumberAnimation { target: lock; property: "x"; to: 14; duration: 70 }
     }
     Text {
-        visible: pill.phase === "failed" || pill.phase === "success"
-        anchors { left: parent.left; leftMargin: 52; right: parent.right; rightMargin: 16; verticalCenter: parent.verticalCenter }
-        elide: Text.ElideRight
+        id: msg
+        x: 52
+        anchors.verticalCenter: parent.verticalCenter
         text: pill.phase === "success" ? "Unlocked" : pill.label()
-        font { family: Theme.ui; pixelSize: 14; weight: Font.DemiBold }
+        font { family: Theme.ui; pixelSize: 15; weight: Font.Bold }
         color: pill.phase === "success" ? Theme.fg : Theme.red
+        // проявляется, когда пилюля уже доросла до своей ширины, иначе вылезает за край
+        opacity: (pill.phase === "success" || pill.phase === "failed") && pill.width >= pill.wantW - 8 ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 140 } }
     }
 }
