@@ -24,6 +24,7 @@ py_sources = [
     'cli/disable.py',
     'cli/doctor.py',
     'cli/list.py',
+    'cli/log.py',
     'cli/remove.py',
     'cli/set.py',
     'cli/snap.py',

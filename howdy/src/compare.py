@@ -23,6 +23,7 @@ import snapshot
 import numpy as np
 import _thread as thread
 import paths_factory
+import paths
 from recorders.video_capture import VideoCapture
 from i18n import _
 
@@ -34,9 +35,65 @@ def exit(code=None):
 	if "gtk_proc" in globals():
 		gtk_proc.terminate()
 
-	# Exit compare
+	# Record the outcome, then exit compare
 	if code is not None:
+		write_scan_log(code)
 		sys.exit(code)
+
+
+SCAN_REASONS = {
+	0: "success",
+	1: "error",
+	10: "no face model enrolled",
+	11: "no match before timeout",
+	12: "misconfigured or unsupported",
+	13: "frames too dark or black",
+}
+
+
+def write_scan_log(code):
+	"""Append one JSON line describing this scan to the scan log, never raising"""
+	try:
+		cfg = globals().get("config")
+		if cfg is not None and not cfg.getboolean("core", "scan_log", fallback=True):
+			return
+
+		started = timings.get("st", time.time()) if "timings" in globals() else time.time()
+		best = globals().get("lowest_certainty", 10)
+		reason = SCAN_REASONS.get(code, "exit " + str(code))
+		if code == 11 and globals().get("liveness_rejects", 0):
+			reason = "face recognised but rejected by liveness"
+
+		entry = {
+			"time": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+			"user": globals().get("user", ""),
+			"code": code,
+			"result": reason,
+			"seconds": round(time.time() - started, 2),
+			"frames": globals().get("frames", 0),
+			"dark_frames": globals().get("dark_tries", 0),
+			"black_frames": globals().get("black_tries", 0),
+			"best_certainty": round(best * 10, 2) if best < 10 else None,
+		}
+		if globals().get("liveness_best", 0):
+			entry["liveness"] = round(liveness_best, 2)
+
+		directory = str(paths.log_path)
+		os.makedirs(directory, mode=0o700, exist_ok=True)
+		path = os.path.join(directory, "scans.log")
+
+		# Keep the log small: past 256 KB only the newest 200 lines survive
+		if os.path.exists(path) and os.path.getsize(path) > 256 * 1024:
+			with open(path) as handle:
+				tail = handle.readlines()[-200:]
+			with open(path, "w") as handle:
+				handle.writelines(tail)
+
+		fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+		with os.fdopen(fd, "a") as handle:
+			handle.write(json.dumps(entry) + "\n")
+	except Exception:
+		pass
 
 
 def init_detector(lock):

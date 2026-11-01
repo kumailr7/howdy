@@ -110,6 +110,24 @@ if extra:
 else:
 	print(_("[ -- ] No quickshell lock screen PAM config uses howdy (ignore if you use another locker)"))
 
+# Summary of recent scans from the scan log
+try:
+	import json
+	import paths
+	with open(os.path.join(str(paths.log_path), "scans.log")) as handle:
+		recent = [json.loads(line) for line in handle.readlines()[-20:] if line.strip()]
+	if recent:
+		failed = [e for e in recent if e.get("code") != 0]
+		reasons = {}
+		for entry in failed:
+			reasons[entry.get("result", "?")] = reasons.get(entry.get("result", "?"), 0) + 1
+		text = _("Last {} scans: {} failed").format(len(recent), len(failed))
+		if reasons:
+			text += " (" + ", ".join("{} x {}".format(n, r) for r, n in sorted(reasons.items(), key=lambda i: -i[1])) + ")"
+		print(text + _(", see: sudo howdy log"))
+except (OSError, ValueError):
+	pass
+
 print()
 if problems:
 	print(_("{} problem(s) found").format(problems))
