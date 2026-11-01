@@ -2,7 +2,7 @@ import QtQuick
 import qs
 
 // пилюля распознавания лица, как у Face ID на айфоне: ищет — остров раздаётся в скруглённый квадрат с зелёным вращающимся
-// каркасным шаром; узнал — вытянутая пилюля, замок слева открывается; не узнал — красный закрытый замок и причина.
+// каркасным шаром; узнал — вытянутая пилюля, замок слева открывается и подпись «Unlocked»; не узнал — красный закрытый замок и причина.
 // Общая для острова на рабочем столе (FaceIsland) и для экрана блокировки. Кладётся внутрь Stage;
 // holderWidth — ширина холста, по которой пилюля центрируется
 Rectangle {
@@ -150,11 +150,11 @@ Rectangle {
         NumberAnimation { target: lock; property: "x"; to: 14; duration: 70 }
     }
     Text {
-        visible: pill.phase === "failed"
+        visible: pill.phase === "failed" || pill.phase === "success"
         anchors { left: parent.left; leftMargin: 52; right: parent.right; rightMargin: 16; verticalCenter: parent.verticalCenter }
         elide: Text.ElideRight
-        text: pill.label()
+        text: pill.phase === "success" ? "Unlocked" : pill.label()
         font { family: Theme.ui; pixelSize: 14; weight: Font.DemiBold }
-        color: Theme.red
+        color: pill.phase === "success" ? Theme.fg : Theme.red
     }
 }
