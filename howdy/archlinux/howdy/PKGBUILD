@@ -7,7 +7,7 @@
 #   "git+https://github.com/boltgolt/howdy.git#branch=beta"
 
 pkgname=howdy-git
-pkgver=3.0.0.beta.r611.g5e415e5
+pkgver=3.0.0.beta.r613.g3db94f9
 pkgrel=1
 pkgdesc="Windows Hello style face authentication for Linux (meson build, PAM module + GTK UI) - release Kakarot"
 arch=('x86_64')
@@ -38,7 +38,7 @@ optdepends=(
 	'python-ffmpeg: ffmpeg recording plugin (AUR)'
 	'polkit: graphical privilege prompt for howdy-gtk'
 	'python-onnxruntime: liveness (anti-spoofing) check, see [liveness] in config.ini'
-	'v4l-utils: camera discovery'
+	'v4l-utils: camera discovery and camera controls (v4l2_controls in config.ini)'
 )
 backup=('etc/howdy/config.ini')
 _repo="${BASH_SOURCE[0]%/*}"

@@ -17,6 +17,7 @@ py_paths = configure_file(
 )
 
 py_sources = [
+    'camera_controls.py',
     'cli/__init__.py',
     'cli/add.py',
     'cli/clear.py',

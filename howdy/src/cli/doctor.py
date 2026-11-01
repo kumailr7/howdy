@@ -48,6 +48,19 @@ if config_ok:
 	report(bool(found), _("Camera {}").format(found[0] if found else device_path or "(unset)"),
 		_("None of the configured device_path entries exist, check video.device_path"))
 
+# Camera controls from the config, applied with v4l2-ctl before each scan
+if config_ok:
+	import camera_controls
+	import shutil
+	chosen = found[0] if found else ""
+	wanted, rejected = camera_controls.controls_for(config, chosen)
+	if wanted:
+		report(shutil.which("v4l2-ctl") is not None, _("Camera controls {}").format(", ".join(wanted)),
+			_("v4l2-ctl is not installed, so these are ignored: pacman -S v4l-utils"))
+	if rejected:
+		report(False, _("Camera controls not understood: {}").format(", ".join(rejected)),
+			_("Use name=value pairs like brightness=190, see v4l2-ctl --list-ctrls"))
+
 # The enrolled face model of this user
 model_path = paths_factory.user_model_path(user)
 report(os.path.isfile(model_path), _("Face model for {}").format(user),

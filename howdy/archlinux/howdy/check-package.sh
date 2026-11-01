@@ -16,6 +16,7 @@ for want in \
 	/usr/lib/security/pam_howdy.so \
 	/usr/lib/howdy/compare.py \
 	/usr/lib/howdy/scanlog.py \
+	/usr/lib/howdy/camera_controls.py \
 	/usr/lib/howdy/cli/doctor.py \
 	/usr/lib/howdy/cli/log.py \
 	/usr/share/howdy/liveness/MiniFASNetV2.onnx \

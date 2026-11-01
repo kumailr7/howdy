@@ -7,6 +7,7 @@ import cv2
 import os
 import sys
 
+import camera_controls
 from i18n import _
 
 # Class to provide boilerplate code to build a video recorder with the
@@ -50,6 +51,10 @@ class VideoCapture:
 		# The frame height
 		self.fh = None
 		self._create_reader()
+
+		# Apply configured camera controls (brightness, exposure, ...), like a bright
+		# image in a dim room; failures are ignored
+		camera_controls.apply(self.config, self.device_path)
 
 		# Request a frame to wake the camera up
 		self.internal.grab()

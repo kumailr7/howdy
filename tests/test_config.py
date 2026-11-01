@@ -11,13 +11,17 @@ class ConfigTest(unittest.TestCase):
 		self.config.read(CONFIG)
 
 	def test_sections_exist(self):
-		for section in ("core", "video", "snapshots", "service_certainty", "intruder", "liveness", "debug"):
+		for section in ("core", "video", "snapshots", "service_certainty", "camera_controls", "intruder", "liveness", "debug"):
 			self.assertTrue(self.config.has_section(section), section)
 
 	def test_risky_features_default_off(self):
 		self.assertFalse(self.config.getboolean("intruder", "enabled"))
 		self.assertFalse(self.config.getboolean("liveness", "enabled"))
 		self.assertEqual(self.config.getfloat("video", "dark_giveup"), 0)
+
+	def test_camera_controls_default_empty(self):
+		self.assertEqual(self.config.get("video", "v4l2_controls"), "")
+		self.assertEqual(self.config.items("camera_controls"), [])
 
 	def test_scan_log_default_on(self):
 		self.assertTrue(self.config.getboolean("core", "scan_log"))
