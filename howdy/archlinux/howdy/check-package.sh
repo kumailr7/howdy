@@ -13,6 +13,7 @@ status=0
 for want in \
 	/etc/howdy/config.ini \
 	/usr/share/libalpm/hooks/howdy-config.hook \
+	/usr/lib/tmpfiles.d/howdy.conf \
 	/usr/lib/security/pam_howdy.so \
 	/usr/lib/howdy/compare.py \
 	/usr/lib/howdy/scanlog.py \

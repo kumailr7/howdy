@@ -7,7 +7,7 @@
 #   "git+https://github.com/boltgolt/howdy.git#branch=beta"
 
 pkgname=howdy-git
-pkgver=3.0.0.beta.r614.g441d566
+pkgver=3.0.0.beta.r615.g4acd4bd
 pkgrel=1
 pkgdesc="Windows Hello style face authentication for Linux (meson build, PAM module + GTK UI) - release Kakarot"
 arch=('x86_64')
@@ -51,6 +51,7 @@ source=(
 	"https://github.com/yakhyo/face-anti-spoofing/releases/download/weights/MiniFASNetV2.onnx"
 	"https://github.com/yakhyo/face-anti-spoofing/releases/download/weights/MiniFASNetV1SE.onnx"
 	"howdy-config.hook"
+	"howdy.tmpfiles"
 )
 noextract=(
 	"dlib_face_recognition_resnet_model_v1.dat.bz2"
@@ -63,6 +64,7 @@ sha256sums=('SKIP'
             '6e787bbebf5c9efdb793f6cd1f023230c4413306605f24f299f12869f95aa472'
             'b32929adc2d9c34b9486f8c4c7bc97c1b69bc0ea9befefc380e4faae4e463907'
             'ebab7f90c7833fbccd46d3a555410e78d969db5438e169b6524be444862b3676'
+            'SKIP'
             'SKIP')
 
 pkgver() {
@@ -99,6 +101,9 @@ package() {
 
 	# warns after an install/upgrade if the config went missing
 	install -Dm644 "$srcdir/howdy-config.hook" "$pkgdir/usr/share/libalpm/hooks/howdy-config.hook"
+
+	# the scan status file exists from boot on, so shells can watch it
+	install -Dm644 "$srcdir/howdy.tmpfiles" "$pkgdir/usr/lib/tmpfiles.d/howdy.conf"
 
 	# failed/successful snapshots contain faces: keep them root-only
 	install -dm700 "$pkgdir/var/log/howdy"

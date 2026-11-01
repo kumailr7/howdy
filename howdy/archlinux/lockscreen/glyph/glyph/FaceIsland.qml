@@ -19,11 +19,14 @@ Scope {
     readonly property bool shown: phase !== "idle"
     readonly property var ignored: ["lock", "lockface", "sddm", "sddm-greeter", "sddm-autologin"]
 
+    property real lastTime: 0
     function apply(text) {
         let s;
         try { s = JSON.parse(text); } catch (e) { return; }
         if (!s || !s.state) return;
         if (Date.now() / 1000 - (s.time ?? 0) > 20) return; // старый статус после перезапуска шелла
+        if (s.time === root.lastTime) return; // этот статус уже показан (файл перечитывается по таймеру)
+        root.lastTime = s.time;
         if (s.user && s.user !== Quickshell.env("USER")) return;
         if (root.ignored.includes(s.service)) return;
         root.reason = s.reason ?? "";
@@ -42,6 +45,9 @@ Scope {
         onFileChanged: reload()
         onLoaded: root.apply(text())
     }
+    // запасной опрос: файл создаётся после старта шелла (/run/howdy появляется при первом скане), и слежение за ним могло не
+    // зацепиться; статус крошечный, перечитываем его пять раз в секунду
+    Timer { running: true; interval: 200; repeat: true; onTriggered: status.reload() }
 
     PanelWindow {
         visible: root.shown || pill.opacity > 0.01

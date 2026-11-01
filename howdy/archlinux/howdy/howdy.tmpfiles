@@ -1,0 +1,3 @@
+# Create the scan status file at boot so desktop shells can watch it from login on
+d /run/howdy 0755 root root -
+f /run/howdy/status.json 0644 root root - {}
