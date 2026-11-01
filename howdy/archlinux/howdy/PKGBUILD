@@ -7,7 +7,7 @@
 #   "git+https://github.com/boltgolt/howdy.git#branch=beta"
 
 pkgname=howdy-git
-pkgver=3.0.0.beta.r606.ge5aa07d
+pkgver=3.0.0.beta.r611.g5e415e5
 pkgrel=1
 pkgdesc="Windows Hello style face authentication for Linux (meson build, PAM module + GTK UI) - release Kakarot"
 arch=('x86_64')

@@ -1,0 +1,39 @@
+name: tests
+on: [push, pull_request]
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Byte-compile the Python sources
+        run: python -m compileall -q howdy/src
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+  arch-package:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install git and sudo
+        run: pacman -Syu --noconfirm git sudo
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Mark the checkout as safe
+        run: git config --global --add safe.directory '*'
+      - name: Install build dependencies
+        working-directory: howdy/archlinux/howdy
+        run: |
+          . ./PKGBUILD
+          pacman -S --needed --noconfirm "${depends[@]}" "${makedepends[@]}"
+      - name: Build the package
+        run: |
+          useradd -m builder
+          chown -R builder .
+          su builder -c 'git config --global --add safe.directory "*" && cd howdy/archlinux/howdy && makepkg -f --noconfirm'
+      - name: Check the package contents
+        run: howdy/archlinux/howdy/check-package.sh

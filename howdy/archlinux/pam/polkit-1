@@ -1,0 +1,11 @@
+#%PAM-1.0
+# Optional: try your face first for graphical password prompts (polkit).
+# Install with:  sudo install -m644 polkit-1 /etc/pam.d/polkit-1
+# If the scan fails or times out you get the normal password prompt.
+# Remove /etc/pam.d/polkit-1 to go back to the system default.
+
+auth       sufficient   /usr/lib/security/pam_howdy.so
+auth       include      system-auth
+account    include      system-auth
+password   include      system-auth
+session    include      system-auth
