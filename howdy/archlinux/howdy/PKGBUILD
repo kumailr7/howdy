@@ -7,7 +7,7 @@
 #   "git+https://github.com/boltgolt/howdy.git#branch=beta"
 
 pkgname=howdy-git
-pkgver=3.0.0.beta.r594.g730ee5b
+pkgver=3.0.0.beta.r601.g8ca7763
 pkgrel=1
 pkgdesc="Windows Hello style face authentication for Linux (meson build, PAM module + GTK UI)"
 arch=('x86_64')
@@ -75,7 +75,8 @@ build() {
 		-Dpython_path=/usr/bin/python \
 		-Dpam_dir=/usr/lib/security \
 		-Dwith_polkit=true \
-		-Dinstall_pam_config=false
+		-Dinstall_pam_config=false \
+		-Dalways_install_config=true
 	meson compile -C build
 }
 

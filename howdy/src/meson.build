@@ -103,7 +103,7 @@ install_data(
 )
 
 fs = import('fs')
-if not fs.exists(config_path)
+if get_option('always_install_config') or not fs.exists(config_path)
     install_data('config.ini', install_dir: confdir, install_mode: 'rwxr--r--', install_tag: 'config')
 endif
 
