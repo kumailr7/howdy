@@ -280,6 +280,11 @@ while True:
 	# skip to the next frame
 	if (hist_total == 0) or (darkness == 100):
 		black_tries += 1
+		# A covered lens only ever returns black frames: stop early instead of
+		# waiting out the whole timeout
+		if black_tries >= 60 and valid_frames == 0:
+			print(_("Camera only returns black frames, is the lens covered?"), file=sys.stderr)
+			exit(13)
 		continue
 
 	dark_running_total += darkness
