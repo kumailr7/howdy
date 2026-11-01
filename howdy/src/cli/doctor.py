@@ -91,7 +91,25 @@ for path in sorted(glob.glob("/etc/pam.d/*")):
 report(bool(services), _("PAM services using howdy: {}").format(", ".join(services) or "-"),
 	_("No /etc/pam.d file loads pam_howdy.so, so nothing will ask for your face"))
 
-# Lock screens with their own PAM config are not in /etc/pam.d, so only mention them
+# Lock screens (quickshell shells, etc.) with their own PAM config live in the user's home
+import pwd
+try:
+	home = pwd.getpwnam(user).pw_dir
+except KeyError:
+	home = ""
+extra = []
+for path in sorted(glob.glob(os.path.join(home, ".config", "quickshell", "*", "pam", "*"))) if home else []:
+	try:
+		with open(path) as handle:
+			if any("pam_howdy" in line and not line.lstrip().startswith("#") for line in handle):
+				extra.append(path)
+	except OSError:
+		pass
+if extra:
+	report(True, _("Lock screen PAM configs using howdy: {}").format(", ".join(extra)))
+else:
+	print(_("[ -- ] No quickshell lock screen PAM config uses howdy (ignore if you use another locker)"))
+
 print()
 if problems:
 	print(_("{} problem(s) found").format(problems))
