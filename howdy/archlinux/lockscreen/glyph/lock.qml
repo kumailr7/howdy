@@ -17,15 +17,24 @@ ShellRoot {
         id: gate
         property string buffer: ""
         property bool fail: false
+        // пилюля распознавания лица: idle | scanning | success | failed
+        property string facePhase: "idle"
+        property string faceReason: ""
+        property bool manualFace: false // сканирует пустой Enter, а не авто-скан
+        property bool faceAborted: false
         property bool leaving: false // пароль принят: поверхность доигрывает уход, потом unlockT снимает лок
         readonly property bool busy: pam.active || facePam.active
         function submit() {
             if (leaving) return;
             if (facePam.active) {
                 if (!buffer) return; // идёт авто-скан лица; пароль его перебивает
+                faceAborted = true;
+                facePhase = "idle";
                 facePam.abort();
             }
             if (pam.active) return; // пустой Enter = попытка по лицу (howdy)
+            manualFace = !buffer;
+            if (manualFace) { faceReason = ""; facePhase = "scanning"; faceHideT.stop(); }
             pam.start();
         }
     }
@@ -37,6 +46,11 @@ ShellRoot {
         onResponseRequiredChanged: if (responseRequired) respond(gate.buffer)
         onCompleted: res => {
             gate.buffer = "";
+            if (gate.manualFace) {
+                gate.facePhase = res === PamResult.Success ? "success" : "failed";
+                gate.manualFace = false;
+                if (res !== PamResult.Success) faceHideT.restart();
+            }
             if (res === PamResult.Success) {
                 gate.leaving = true;
                 unlockT.start();
@@ -49,6 +63,9 @@ ShellRoot {
         config: "lockface"
         configDirectory: Quickshell.shellPath("pam")
         onCompleted: res => {
+            if (gate.faceAborted) { gate.faceAborted = false; return; }
+            gate.facePhase = res === PamResult.Success ? "success" : "failed";
+            if (res !== PamResult.Success) faceHideT.restart();
             if (res === PamResult.Success && !gate.leaving) {
                 gate.buffer = "";
                 gate.leaving = true;
@@ -56,7 +73,21 @@ ShellRoot {
             }
         }
     }
-    Timer { id: faceT; interval: 600; onTriggered: if (!gate.leaving && !pam.active && !facePam.active) facePam.start() }
+    Timer { id: faceT; interval: 600; onTriggered: if (!gate.leaving && !pam.active && !facePam.active) { gate.faceAborted = false; gate.faceReason = ""; gate.facePhase = "scanning"; faceHideT.stop(); facePam.start(); } }
+    Timer { id: faceHideT; interval: 3000; onTriggered: gate.facePhase = "idle" }
+    // причина промаха — из статуса, который пишет howdy (compare.py)
+    FileView {
+        path: "/run/howdy/status.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const st = JSON.parse(text());
+                if (st.state === "failed" && (st.service === "lock" || st.service === "lockface")) gate.faceReason = st.reason ?? "";
+            } catch (e) {}
+        }
+    }
     // повторный скан при пробуждении: экран включился после DPMS-сна (hypridle) или система вышла из suspend (logind)
     property bool dpmsOn: true
     Process {

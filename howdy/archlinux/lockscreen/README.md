@@ -15,12 +15,15 @@ location is `~/.local/share/glyph/config/quickshell/glyph`). Run
 
 ## Face scan pill (dynamic island)
 
+- `glyph/components/FacePill.qml`: the pill itself, shared by the desktop island
+  and the lock screen. `glyph/lock/LockSurface.qml` shows it on the lock screen
+  and `lock.qml` drives it (scanning, success, failed with a reason).
 - `glyph/glyph/FaceIsland.qml`: a pill at the top of the screen while howdy is
   scanning (sudo, polkit, ...): a spinning dot ring, then a check mark and
   "unlocked", or a cross with the reason ("too dark", "not recognised", ...).
   It reads `/run/howdy/status.json`, which `compare.py` writes (config option
-  `scan_status` in `[core]`). The lock screen has its own indicator, so scans for
-  the `lock`, `lockface` and `sddm` services are ignored.
+  `scan_status` in `[core]`). Scans for the `lock`, `lockface` and `sddm`
+  services are ignored there, because the lock screen shows its own pill.
 - Add it to `glyph/Glyph.qml` below the `LiveIsland` line, so it sits under the
   live island when both are visible:
 
