@@ -1,8 +1,5 @@
-pkg
-src
-*.tar.gz
-*.zip
-*.tar.xz
-*.patch
-*.dat.bz2
-.SRCINFO
+# makepkg build output
+/howdy/
+/src/
+/pkg/
+*.pkg.tar.*
