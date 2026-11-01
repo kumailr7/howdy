@@ -31,8 +31,11 @@ class VideoCapture:
 		else:
 			self.config = config
 
+		# device_path may be a comma separated list, the first one that exists is used
+		self.device_path = self._pick_device_path()
+
 		# Check device path
-		if not os.path.exists(self.config.get("video", "device_path")):
+		if not os.path.exists(self.device_path):
 			if self.config.getboolean("video", "warn_no_device", fallback=True):
 				print(_("Howdy could not find a camera device at the path specified in the config file."))
 				print(_("It is very likely that the path is not configured correctly, please edit the 'device_path' config value by running:"))
@@ -50,6 +53,17 @@ class VideoCapture:
 
 		# Request a frame to wake the camera up
 		self.internal.grab()
+
+	def _pick_device_path(self):
+		"""
+		Return the first existing path from the comma separated device_path
+		option, or the first entry if none exist
+		"""
+		paths = [p.strip() for p in self.config.get("video", "device_path").split(",") if p.strip()]
+		for path in paths:
+			if os.path.exists(path):
+				return path
+		return paths[0] if paths else ""
 
 	def __del__(self):
 		"""
@@ -106,7 +120,7 @@ class VideoCapture:
 			# Set the capture source for ffmpeg
 			from recorders.ffmpeg_reader import ffmpeg_reader
 			self.internal = ffmpeg_reader(
-				self.config.get("video", "device_path"),
+				self.device_path,
 				self.config.get("video", "device_format", fallback="v4l2")
 			)
 
@@ -114,14 +128,14 @@ class VideoCapture:
 			# Set the capture source for pyv4l2
 			from recorders.pyv4l2_reader import pyv4l2_reader
 			self.internal = pyv4l2_reader(
-				self.config.get("video", "device_path"),
+				self.device_path,
 				self.config.get("video", "device_format", fallback="v4l2")
 			)
 
 		else:
 			# Start video capture on the IR camera through OpenCV
 			self.internal = cv2.VideoCapture(
-				self.config.get("video", "device_path"),
+				self.device_path,
 				cv2.CAP_V4L
 			)
 			# Set the capture frame rate
