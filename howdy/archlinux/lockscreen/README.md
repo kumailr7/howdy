@@ -12,3 +12,16 @@ Copies of the files changed in `~/.config/quickshell/glyph/` to use howdy:
 Install by copying them back into `~/.config/quickshell/glyph/` (the real
 location is `~/.local/share/glyph/config/quickshell/glyph`). Run
 `sudo howdy doctor` to check the PAM side.
+
+## Face scan pill (dynamic island)
+
+- `glyph/glyph/FaceIsland.qml`: a pill at the top of the screen while howdy is
+  scanning (sudo, polkit, ...): a spinning dot ring, then a check mark and
+  "unlocked", or a cross with the reason ("too dark", "not recognised", ...).
+  It reads `/run/howdy/status.json`, which `compare.py` writes (config option
+  `scan_status` in `[core]`). The lock screen has its own indicator, so scans for
+  the `lock`, `lockface` and `sddm` services are ignored.
+- Add it to `glyph/Glyph.qml` below the `LiveIsland` line, so it sits under the
+  live island when both are visible:
+
+      FaceIsland { offset: live.occupied }

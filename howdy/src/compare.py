@@ -27,6 +27,7 @@ import _thread as thread
 import paths_factory
 import paths
 import scanlog
+import scanstatus
 from recorders.video_capture import VideoCapture
 from i18n import _
 
@@ -41,6 +42,7 @@ def exit(code=None):
 	# Record the outcome, then exit compare
 	if code is not None:
 		write_scan_log(code)
+		publish_status(code)
 		sys.exit(code)
 
 
@@ -52,6 +54,17 @@ SCAN_REASONS = {
 	12: "misconfigured or unsupported",
 	13: "frames too dark or black",
 }
+
+
+def publish_status(code):
+	"""Tell desktop shells how the scan ended"""
+	cfg = globals().get("config")
+	if cfg is not None and not cfg.getboolean("core", "scan_status", fallback=True):
+		return
+	reason = SCAN_REASONS.get(code, "exit " + str(code))
+	if code == 11 and globals().get("liveness_rejects", 0):
+		reason = "face recognised but rejected by liveness"
+	scanstatus.write("success" if code == 0 else "failed", globals().get("user", ""), globals().get("service", ""), reason)
 
 
 def write_scan_log(code):
@@ -222,6 +235,10 @@ if len(models) < 1:
 # Read config from disk
 config = configparser.ConfigParser()
 config.read(paths_factory.config_file_path())
+
+# Let desktop shells know a scan started
+if config.getboolean("core", "scan_status", fallback=True):
+	scanstatus.write("scanning", user, service)
 
 # Get all config values needed
 use_cnn = config.getboolean("core", "use_cnn", fallback=False)

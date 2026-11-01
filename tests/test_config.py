@@ -23,6 +23,9 @@ class ConfigTest(unittest.TestCase):
 		self.assertEqual(self.config.get("video", "v4l2_controls"), "")
 		self.assertEqual(self.config.items("camera_controls"), [])
 
+	def test_scan_status_default_on(self):
+		self.assertTrue(self.config.getboolean("core", "scan_status"))
+
 	def test_scan_log_default_on(self):
 		self.assertTrue(self.config.getboolean("core", "scan_log"))
 
