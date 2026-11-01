@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = howdy-git
+
+[Action]
+Description = Checking that the howdy config survived...
+When = PostTransaction
+Exec = /bin/sh -c '[ -f /etc/howdy/config.ini ] || echo "howdy: /etc/howdy/config.ini is missing; restore it from /etc/howdy/config.ini.pacsave if present"'
