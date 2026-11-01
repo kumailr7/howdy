@@ -148,6 +148,8 @@ save_failed = config.getboolean("snapshots", "save_failed", fallback=False)
 save_successful = config.getboolean("snapshots", "save_successful", fallback=False)
 gtk_stdout = config.getboolean("debug", "gtk_stdout", fallback=False)
 rotate = config.getint("video", "rotate", fallback=0)
+liveness_enabled = config.getboolean("liveness", "enabled", fallback=False)
+liveness_threshold = config.getfloat("liveness", "threshold", fallback=0.8)
 
 # Send the gtk output to the terminal if enabled in the config
 gtk_pipe = sys.stdout if gtk_stdout else subprocess.DEVNULL
@@ -188,6 +190,19 @@ timings["ic"] = time.time() - timings["ic"]
 lock.acquire()
 lock.release()
 del lock
+
+# Set up the liveness (anti-spoofing) check if enabled.
+# Fails closed: if it is enabled but cannot run, nobody is let in by face.
+liveness_check = None
+liveness_rejects = 0
+liveness_best = 0.0
+if liveness_enabled:
+	try:
+		import liveness
+		liveness_check = liveness.Liveness()
+	except Exception as err:
+		print(_("Liveness check is enabled but unavailable: ") + str(err), file=sys.stderr)
+		exit(1)
 
 # Fetch the max frame height
 max_height = config.getfloat("video", "max_height", fallback=320.0)
@@ -238,6 +253,9 @@ while True:
 			print(_("Average darkness: {avg}, Threshold: {threshold}").format(avg=str(dark_running_total / max(1, valid_frames)), threshold=str(dark_threshold)))
 			exit(13)
 		else:
+			# A face was recognised but never passed the liveness check
+			if liveness_rejects:
+				print(_("Face recognised, but rejected by the liveness check (best score {score:.2f}, needs {threshold:.2f})").format(score=liveness_best, threshold=liveness_threshold), file=sys.stderr)
 			exit(11)
 
 	# Grab a single frame of video
@@ -273,6 +291,10 @@ while True:
 		dark_tries += 1
 		continue
 
+	# Keep the full resolution frame for the liveness check, which needs the
+	# fine texture that downscaling throws away
+	full_frame = frame
+
 	# If the height is too high
 	if scaling_factor != 1:
 		# Apply that factor to the frame
@@ -284,18 +306,22 @@ while True:
 		if frames % 3 == 1:
 			frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 			gsframe = cv2.rotate(gsframe, cv2.ROTATE_90_COUNTERCLOCKWISE)
+			full_frame = cv2.rotate(full_frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 		if frames % 3 == 2:
 			frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 			gsframe = cv2.rotate(gsframe, cv2.ROTATE_90_CLOCKWISE)
+			full_frame = cv2.rotate(full_frame, cv2.ROTATE_90_CLOCKWISE)
 
 	# If camera is configured to rotate = 2, check portrait orientation
 	elif rotate == 2:
 		if frames % 2 == 0:
 			frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 			gsframe = cv2.rotate(gsframe, cv2.ROTATE_90_COUNTERCLOCKWISE)
+			full_frame = cv2.rotate(full_frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 		else:
 			frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 			gsframe = cv2.rotate(gsframe, cv2.ROTATE_90_CLOCKWISE)
+			full_frame = cv2.rotate(full_frame, cv2.ROTATE_90_CLOCKWISE)
 
 	# Get all faces from that frame as encodings
 	# Upsamples 1 time
@@ -322,6 +348,22 @@ while True:
 
 		# Check if a match that's confident enough
 		if 0 < match < video_certainty:
+			# The face matches, but is it a live face and not a photo or a screen?
+			if liveness_check is not None:
+				# The face box is in the downscaled frame, map it back to full resolution
+				real = liveness_check.score(
+					full_frame,
+					fl.left() / scaling_factor,
+					fl.top() / scaling_factor,
+					fl.width() / scaling_factor,
+					fl.height() / scaling_factor
+				)
+				liveness_best = max(liveness_best, real)
+
+				if real < liveness_threshold:
+					liveness_rejects += 1
+					continue
+
 			timings["tt"] = time.time() - timings["st"]
 			timings["fl"] = time.time() - timings["fr"]
 
@@ -354,6 +396,9 @@ while True:
 				print(_("Certainty of winning frame: %.3f") % (match * 10, ))
 
 				print(_("Winning model: %d (\"%s\")") % (match_index, models[match_index]["label"]))
+
+				if liveness_check is not None:
+					print(_("Liveness score: %.2f (needs %.2f), rejected frames: %d") % (liveness_best, liveness_threshold, liveness_rejects))
 
 			# Make snapshot if enabled
 			if save_successful:

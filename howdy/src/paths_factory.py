@@ -46,3 +46,7 @@ def user_models_dir_path() -> PurePath:
 
 def logo_path() -> str:
     return str(paths.data_dir / "logo.png")
+
+
+def liveness_model_path(name: str) -> str:
+    return str(paths.data_dir / "liveness" / name)
