@@ -31,18 +31,11 @@ Scope {
     }
     Timer { id: hideT; interval: 4500; onTriggered: root.shown = false }
 
-    Repeater {
-        model: Bluetooth.devices
-        delegate: Item {
-            required property var modelData
-            Connections {
-                target: modelData
-                function onConnectedChanged() {
-                    if (modelData.connected && root.armed && root.isHeadset(modelData)) root.show(modelData);
-                    else if (!modelData.connected && root.dev === modelData) root.shown = false;
-                }
-            }
-        }
+    // как Sys.buds: первое подключённое устройство-гарнитура; смена — повод показать пилюлю
+    readonly property var current: Bluetooth.devices.values.find(d => d.connected && isHeadset(d)) ?? null
+    onCurrentChanged: {
+        if (current && armed) show(current);
+        else if (!current) shown = false;
     }
 
     PanelWindow {
