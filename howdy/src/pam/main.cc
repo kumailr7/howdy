@@ -263,8 +263,18 @@ auto identify(pam_handle_t *pamh, int flags, int argc, const char **argv,
     }
   }
 
+  // The PAM service asking for authentication (sudo, sddm, ...), passed on so
+  // compare.py can apply per-service settings and log it
+  const void *service_item = nullptr;
+  if (pam_get_item(pamh, PAM_SERVICE, &service_item) != PAM_SUCCESS ||
+      service_item == nullptr) {
+    service_item = "";
+  }
+  const char *service = static_cast<const char *>(service_item);
+
   const char *const args[] = {PYTHON_EXECUTABLE_PATH, // NOLINT
-                              COMPARE_PROCESS_PATH, username, nullptr};
+                              COMPARE_PROCESS_PATH, username, service,
+                              nullptr};
   pid_t child_pid;
 
   // Start the python subprocess

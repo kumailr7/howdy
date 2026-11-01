@@ -19,11 +19,14 @@ import cv2
 from datetime import timezone, datetime
 import atexit
 import subprocess
+import shlex
+import syslog
 import snapshot
 import numpy as np
 import _thread as thread
 import paths_factory
 import paths
+import scanlog
 from recorders.video_capture import VideoCapture
 from i18n import _
 
@@ -67,6 +70,7 @@ def write_scan_log(code):
 		entry = {
 			"time": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
 			"user": globals().get("user", ""),
+			"service": globals().get("service", ""),
 			"code": code,
 			"result": reason,
 			"seconds": round(time.time() - started, 2),
@@ -77,21 +81,40 @@ def write_scan_log(code):
 		}
 		if globals().get("liveness_best", 0):
 			entry["liveness"] = round(liveness_best, 2)
+		if globals().get("faces_seen", 0) and code != 0:
+			entry["stranger"] = True
+		if globals().get("intruder_snapshot"):
+			entry["snapshot"] = intruder_snapshot
 
-		directory = str(paths.log_path)
-		os.makedirs(directory, mode=0o700, exist_ok=True)
-		path = os.path.join(directory, "scans.log")
+		scanlog.append(paths.log_path, entry)
+	except Exception:
+		pass
 
-		# Keep the log small: past 256 KB only the newest 200 lines survive
-		if os.path.exists(path) and os.path.getsize(path) > 256 * 1024:
-			with open(path) as handle:
-				tail = handle.readlines()[-200:]
-			with open(path, "w") as handle:
-				handle.writelines(tail)
 
-		fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
-		with os.fdopen(fd, "a") as handle:
-			handle.write(json.dumps(entry) + "\n")
+def handle_intruder():
+	"""A face was seen but did not match: keep a photo and alert after repeated attempts"""
+	global intruder_snapshot
+	intruder_snapshot = None
+	try:
+		if not intruder_enabled or not faces_seen:
+			return
+
+		try:
+			intruder_snapshot = make_snapshot(_("INTRUDER"))
+		except Exception:
+			intruder_snapshot = None
+
+		# Count recent unknown-face attempts, including this one
+		alert_after = config.getint("intruder", "alert_after", fallback=3)
+		window = config.getint("intruder", "window", fallback=300)
+		recent = 1 + scanlog.count_strangers(paths.log_path, window)
+
+		syslog.syslog(syslog.LOG_WARNING, "pam_howdy: unknown face tried to log in as {} ({} in the last {}s)".format(user, recent, window))
+
+		command = config.get("intruder", "command", fallback="").strip()
+		if command and recent >= alert_after:
+			env = dict(os.environ, HOWDY_USER=user, HOWDY_SERVICE=service, HOWDY_COUNT=str(recent), HOWDY_SNAPSHOT=intruder_snapshot or "")
+			subprocess.Popen(shlex.split(command), env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 	except Exception:
 		pass
 
@@ -125,7 +148,7 @@ def init_detector(lock):
 
 def make_snapshot(type):
 	"""Generate snapshot after detection"""
-	snapshot.generate(snapframes, [
+	return snapshot.generate(snapframes, [
 		type + _(" LOGIN"),
 		_("Date: ") + datetime.now(timezone.utc).strftime("%Y/%m/%d %H:%M:%S UTC"),
 		_("Scan time: ") + str(round(time.time() - timings["fr"], 2)) + "s",
@@ -159,6 +182,8 @@ if len(sys.argv) < 2:
 
 # The username of the user being authenticated
 user = sys.argv[1]
+# The PAM service asking for authentication (sudo, sddm, ...), if the PAM module told us
+service = sys.argv[2] if len(sys.argv) > 2 else ""
 # The model file contents
 models = []
 # Encoded face models
@@ -171,6 +196,9 @@ dark_tries = 0
 frames = 0
 # Captured frames for snapshot capture
 snapframes = []
+# Amount of faces detected that were not yet matched
+faces_seen = 0
+intruder_snapshot = None
 # Tracks the lowest certainty value in the loop
 lowest_certainty = 10
 # Face recognition/detection instances
@@ -200,6 +228,12 @@ use_cnn = config.getboolean("core", "use_cnn", fallback=False)
 timeout = config.getint("video", "timeout", fallback=4)
 dark_threshold = config.getfloat("video", "dark_threshold", fallback=50.0)
 video_certainty = config.getfloat("video", "certainty", fallback=3.5) / 10
+# A stricter (or looser) certainty for one PAM service, e.g. sudo = 3.0
+if service and config.has_option("service_certainty", service):
+	video_certainty = config.getfloat("service_certainty", service) / 10
+# Give up early in a dark room after this many seconds (0 = wait for the timeout)
+dark_giveup = config.getfloat("video", "dark_giveup", fallback=0)
+intruder_enabled = config.getboolean("intruder", "enabled", fallback=False)
 end_report = config.getboolean("debug", "end_report", fallback=False)
 save_failed = config.getboolean("snapshots", "save_failed", fallback=False)
 save_successful = config.getboolean("snapshots", "save_successful", fallback=False)
@@ -310,6 +344,7 @@ while True:
 			print(_("Average darkness: {avg}, Threshold: {threshold}").format(avg=str(dark_running_total / max(1, valid_frames)), threshold=str(dark_threshold)))
 			exit(13)
 		else:
+			handle_intruder()
 			# A face was recognised but never passed the liveness check
 			if liveness_rejects:
 				print(_("Face recognised, but rejected by the liveness check (best score {score:.2f}, needs {threshold:.2f})").format(score=liveness_best, threshold=liveness_threshold), file=sys.stderr)
@@ -320,7 +355,7 @@ while True:
 	gsframe = clahe.apply(gsframe)
 
 	# If snapshots have been turned on
-	if save_failed or save_successful:
+	if save_failed or save_successful or intruder_enabled:
 		# Start capturing frames for the snapshot
 		if len(snapframes) < 3:
 			snapframes.append(frame)
@@ -351,6 +386,10 @@ while True:
 	# skip to the next frame
 	if (darkness > dark_threshold):
 		dark_tries += 1
+		# Nothing but dark frames for a while: the room is too dark, stop waiting
+		if dark_giveup > 0 and dark_tries == valid_frames and time.time() - timings["fr"] > dark_giveup:
+			print(_("Too dark to see a face, falling back"), file=sys.stderr)
+			exit(13)
 		continue
 
 	# Keep the full resolution frame for the liveness check, which needs the
@@ -396,6 +435,7 @@ while True:
 		# Fetch the faces in the image
 		face_landmark = pose_predictor(frame, fl)
 		face_encoding = np.array(face_encoder.compute_face_descriptor(frame, face_landmark, 1))
+		faces_seen += 1
 
 		# Match this found face against a known face
 		matches = np.linalg.norm(encodings - face_encoding, axis=1)

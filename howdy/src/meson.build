@@ -41,6 +41,7 @@ py_sources = [
     'rubberstamps/__init__.py',
     'rubberstamps/hotkey.py',
     'rubberstamps/nod.py',
+    'scanlog.py',
     'snapshot.py',
     'liveness.py',
     py_paths,
