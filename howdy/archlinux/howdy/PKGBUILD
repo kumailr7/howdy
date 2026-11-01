@@ -1,55 +1,91 @@
-# Maintainer: Frank Tackitt <frank@tackitt.net>
-# Maintainer: boltgolt <boltgolt@gmail.com>
-# Co-Maintainer: Raymo111 <hi@raymond.li>
-# Contributor: Kelley McChesney <kelley@kelleymcchesney.us>
+# Maintainer: kumailr7 <kumailrizvi70@gmail.com>
+# Based on the original PKGBUILD by Frank Tackitt, boltgolt, Raymo111, Kelley McChesney
+#
+# Meson-based build of howdy (PAM module + CLI + GTK UI) from this git checkout.
+# Build with:  cd howdy/archlinux/howdy && makepkg -f
+# To track upstream instead, replace the first source with
+#   "git+https://github.com/boltgolt/howdy.git#branch=beta"
 
-pkgname=howdy
-pkgver=2.6.1
+pkgname=howdy-git
+pkgver=3.0.0.beta
 pkgrel=1
-pkgdesc="Windows Hello for Linux"
+pkgdesc="Windows Hello style face authentication for Linux (meson build, PAM module + GTK UI)"
 arch=('x86_64')
 url="https://github.com/boltgolt/howdy"
 license=('MIT')
+provides=('howdy')
+conflicts=('howdy')
 depends=(
-	'opencv'
-	'hdf5'
-	'pam-python'
-	'python3'
+	'pam'
+	'libevdev'
+	'inih'
+	'python'
 	'python-dlib'
 	'python-numpy'
 	'python-opencv'
+	'python-gobject'
+	'gtk3'
 )
 makedepends=(
-	'cmake'
-	'pkgfile'
+	'git'
+	'meson'
+	'gcc'
+	'pkgconf'
+)
+optdepends=(
+	'python-elevate: privilege elevation for howdy-gtk (AUR)'
+	'ffmpeg: ffmpeg recording plugin'
+	'python-ffmpeg: ffmpeg recording plugin (AUR)'
+	'polkit: graphical privilege prompt for howdy-gtk'
+	'v4l-utils: camera discovery'
 )
 backup=('etc/howdy/config.ini')
+_repo="${BASH_SOURCE[0]%/*}"
 source=(
-	"$pkgname-$pkgver.tar.gz::https://github.com/boltgolt/howdy/archive/v${pkgver}.tar.gz"
+	"howdy::git+file://$(realpath "${_repo:-.}/../../..")"
 	"https://github.com/davisking/dlib-models/raw/master/dlib_face_recognition_resnet_model_v1.dat.bz2"
 	"https://github.com/davisking/dlib-models/raw/master/mmod_human_face_detector.dat.bz2"
 	"https://github.com/davisking/dlib-models/raw/master/shape_predictor_5_face_landmarks.dat.bz2"
 )
-sha256sums=('f3f48599f78fd82b049539fcfc34de25c9435cad732697bdda94e85352964794'
+noextract=(
+	"dlib_face_recognition_resnet_model_v1.dat.bz2"
+	"mmod_human_face_detector.dat.bz2"
+	"shape_predictor_5_face_landmarks.dat.bz2"
+)
+sha256sums=('SKIP'
             'abb1f61041e434465855ce81c2bd546e830d28bcbed8d27ffbe5bb408b11553a'
             'db9e9e40f092c118d5eb3e643935b216838170793559515541c56a2b50d9fc84'
             '6e787bbebf5c9efdb793f6cd1f023230c4413306605f24f299f12869f95aa472')
 
+pkgver() {
+	cd howdy
+	printf "3.0.0.beta.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+	# python_path must be the system interpreter: the PAM module runs it with an
+	# empty environment and only /usr/bin/python can see pacman's python-dlib/opencv.
+	arch-meson howdy build \
+		-Dpython_path=/usr/bin/python \
+		-Dpam_dir=/usr/lib/security \
+		-Dwith_polkit=true \
+		-Dinstall_pam_config=false
+	meson compile -C build
+}
+
 package() {
-	# Installing the proper license files and the rest of howdy
-	cd howdy-$pkgver
-	install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-	mkdir -p "$pkgdir/usr/etc/howdy"
-	mkdir -p "$pkgdir/etc/howdy"
-	cp -r src/* "$pkgdir/usr/etc/howdy"
-	cp -r src/config.ini "$pkgdir/etc/howdy"
-	cp "${srcdir}/dlib_face_recognition_resnet_model_v1.dat" "$pkgdir/usr/etc/howdy/dlib-data/"
-	cp "${srcdir}/mmod_human_face_detector.dat" "$pkgdir/usr/etc/howdy/dlib-data/"
-	cp "${srcdir}/shape_predictor_5_face_landmarks.dat" "$pkgdir/usr/etc/howdy/dlib-data/"
-	chmod 600 -R "$pkgdir/usr/etc/howdy"
-	mkdir -p "$pkgdir/usr/bin"
-	ln -s /etc/howdy/cli.py "$pkgdir/usr/bin/howdy"
-	chmod +x "$pkgdir/etc/howdy/cli.py"
-	mkdir -p "$pkgdir/usr/share/bash-completion/completions"
-	cp autocomplete/howdy "$pkgdir/usr/share/bash-completion/completions/howdy"
+	meson install -C build --destdir "$pkgdir"
+
+	# dlib models (the project's install.sh downloads these at runtime instead)
+	install -dm755 "$pkgdir/usr/share/dlib-data"
+	local f
+	for f in dlib_face_recognition_resnet_model_v1 mmod_human_face_detector shape_predictor_5_face_landmarks; do
+		bzip2 -dc "$srcdir/$f.dat.bz2" > "$pkgdir/usr/share/dlib-data/$f.dat"
+		chmod 644 "$pkgdir/usr/share/dlib-data/$f.dat"
+	done
+
+	# failed/successful snapshots contain faces: keep them root-only
+	install -dm700 "$pkgdir/var/log/howdy"
+
+	install -Dm644 howdy/LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
