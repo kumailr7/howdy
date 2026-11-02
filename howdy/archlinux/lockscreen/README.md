@@ -43,7 +43,9 @@ location is `~/.local/share/glyph/config/quickshell/glyph`). Run
 
 - `glyph/glyph/EventIsland.qml`: one pill with a queue for short events: charger
   plugged or unplugged, low battery (20/10/5%), silent or sound on, volume,
-  mic mute, Do Not Disturb, Wi-Fi network joined, VPN on or off. Add it to
+  mic mute, mic in use by an app, Do Not Disturb, Wi-Fi network joined, VPN on or off,
+  USB device connected or removed (udev), downloads in `~/Downloads` (`.crdownload`
+  and `.part` files), and a Wi-Fi hotspot starting or stopping (NetworkManager). Add it to
   `glyph/Glyph.qml` below the `HeadsetIsland` line:
 
       EventIsland { offset: live.occupied }

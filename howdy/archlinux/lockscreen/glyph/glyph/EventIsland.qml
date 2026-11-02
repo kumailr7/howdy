@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Networking
 import Quickshell.Services.UPower
 import Quickshell.Wayland
@@ -92,6 +93,80 @@ Scope {
     readonly property var wifi: Networking.devices.values.find(d => d.type === DeviceType.Wifi) ?? null
     readonly property string ssid: wifi?.networks?.values?.find(n => n.connected)?.name ?? ""
     onSsidChanged: if (ssid) push({ key: "wifi", icon: "\u{F05A9}", text: ssid, tone: "ok", hold: 2800 });
+
+    // ---- микрофон занят приложением (запись голоса, звонок): как оранжевая точка на айфоне ----
+    Connections {
+        target: Sys
+        function onLiveChanged() {
+            if (Sys.rec) return; // запись экрана показывает живой остров
+            root.push(Sys.live ? { key: "miclive", icon: "\u{F036C}", text: "Mic in use", tone: "bad", hold: 3000 } : { key: "miclive", icon: "\u{F036D}", text: "Mic released" });
+        }
+    }
+
+    // ---- USB: udev присылает блоки «UDEV [время] add|remove путь» и строки KEY=value ----
+    property string usbAct: ""
+    property var usbProps: ({})
+    function usbFlush() {
+        const p = usbProps;
+        const act = usbAct;
+        usbAct = "";
+        usbProps = {};
+        if ((act !== "add" && act !== "remove") || p.DEVTYPE !== "usb_device") return;
+        const name = (p.ID_MODEL_FROM_DATABASE || (p.ID_MODEL ?? "").replace(/_/g, " ") || "USB device").trim();
+        if (/hub/i.test(name)) return;
+        push({ key: "usb:" + name + act, icon: "\u{F0553}", text: name + (act === "add" ? " connected" : " removed"), tone: act === "add" ? "ok" : "bad", hold: 2800 });
+    }
+    Process {
+        running: true
+        command: ["udevadm", "monitor", "--udev", "--property", "--subsystem-match=usb"]
+        stdout: SplitParser {
+            onRead: line => {
+                if (line.startsWith("UDEV")) {
+                    root.usbFlush();
+                    const m = line.match(/\]\s+(\w+)\s/);
+                    root.usbAct = m ? m[1] : "";
+                    usbT.restart();
+                    return;
+                }
+                const i = line.indexOf("=");
+                if (i > 0) root.usbProps[line.slice(0, i)] = line.slice(i + 1);
+            }
+        }
+    }
+    Timer { id: usbT; interval: 350; onTriggered: root.usbFlush() }
+
+    // ---- загрузки: недокачанный файл в ~/Downloads (.crdownload — chromium, .part — firefox) ----
+    property string dl: ""
+    Process {
+        id: dlP
+        command: ["sh", "-c", "ls -t \"$HOME\"/Downloads/*.crdownload \"$HOME\"/Downloads/*.part 2>/dev/null | head -1"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const f = text.trim().split("/").pop().replace(/\.(crdownload|part)$/, "");
+                if (f && !root.dl) root.push({ key: "dl", icon: "\u{F01DA}", text: "Downloading " + (f.length > 28 ? f.slice(0, 27) + "…" : f), hold: 3000 });
+                else if (!f && root.dl) root.push({ key: "dl", icon: "\u{F012C}", text: "Download complete", tone: "ok", hold: 2800 });
+                root.dl = f;
+            }
+        }
+    }
+    Timer { running: true; interval: 2000; repeat: true; onTriggered: if (!dlP.running) dlP.running = true }
+
+    // ---- точка доступа: активное wifi-соединение в режиме ap ----
+    property string hotspot: ""
+    Process {
+        id: hsP
+        command: ["sh", "-c", "nmcli -t -f NAME,TYPE con show --active | awk -F: '$2==\"802-11-wireless\"{print $1}' | while read -r n; do [ \"$(nmcli -g 802-11-wireless.mode con show \"$n\")\" = ap ] && echo \"$n\"; done | head -1"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const n = text.trim();
+                if (n !== root.hotspot) {
+                    root.hotspot = n;
+                    root.push(n ? { key: "hs", icon: "\u{F05A9}", text: "Hotspot on", tone: "ok" } : { key: "hs", icon: "\u{F05A9}", text: "Hotspot off", tone: "bad" });
+                }
+            }
+        }
+    }
+    Timer { running: true; interval: 6000; repeat: true; onTriggered: if (!hsP.running) hsP.running = true }
 
     PanelWindow {
         visible: root.shown || pill.opacity > 0.01
