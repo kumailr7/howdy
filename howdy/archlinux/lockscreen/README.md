@@ -38,3 +38,12 @@ location is `~/.local/share/glyph/config/quickshell/glyph`). Run
   below the `FaceIsland` line:
 
       HeadsetIsland { offset: live.occupied }
+
+## Event pill (charging, sound, mic, DND, Wi-Fi, VPN)
+
+- `glyph/glyph/EventIsland.qml`: one pill with a queue for short events: charger
+  plugged or unplugged, low battery (20/10/5%), silent or sound on, volume,
+  mic mute, Do Not Disturb, Wi-Fi network joined, VPN on or off. Add it to
+  `glyph/Glyph.qml` below the `HeadsetIsland` line:
+
+      EventIsland { offset: live.occupied }
